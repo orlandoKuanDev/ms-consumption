@@ -25,7 +25,7 @@ public class Consumption {
     @Field(name = "description")
     private String description;
 
-    @Field(name = "consumDate")
+    @Field(name = "consumptionDate")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime consumptionDate = LocalDateTime.now();
 }
