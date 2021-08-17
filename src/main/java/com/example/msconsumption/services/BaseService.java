@@ -1,5 +1,6 @@
-package com.example.msconsumption.repositories;
+package com.example.msconsumption.services;
 
+import com.example.msconsumption.repositories.IRepository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 

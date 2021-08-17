@@ -1,7 +1,7 @@
 package com.example.msconsumption.handler;
 
 import com.example.msconsumption.models.Consumption;
-import com.example.msconsumption.repositories.IConsumptionService;
+import com.example.msconsumption.services.IConsumptionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
