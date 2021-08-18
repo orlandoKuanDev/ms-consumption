@@ -1,6 +1,0 @@
-package com.example.msconsumption.repositories;
-
-import com.example.msconsumption.models.Consumption;
-
-public interface IConsumptionService extends IBaseService<Consumption, String>{
-}
