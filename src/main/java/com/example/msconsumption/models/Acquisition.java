@@ -16,5 +16,7 @@ public class Acquisition {
     private List<Customer> customerAuthorizedSigner;
 
     private String iban;
+
+    private Bill bill;
 }
 

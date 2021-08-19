@@ -16,6 +16,8 @@ public class RouterConfig {
     public RouterFunction<ServerResponse> rutas(ConsumptionHandler handler){
         return route(GET("/consumption"), handler::findAll)
                 .andRoute(GET("/consumption/{id}"), handler::findById)
+                .andRoute(GET("/consumption/account/{accountNumber}"), handler::findByBillAccountNumber)
+                .andRoute(GET("/consumption/iban/{iban}"), handler::findByIban)
                 .andRoute(POST("/consumption"), handler::save);
     }
 }
