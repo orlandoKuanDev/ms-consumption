@@ -39,10 +39,14 @@ public class ConsumptionHandler {
     }
 
     public Mono<ServerResponse> save(ServerRequest request){
-        Mono<Consumption> bill = request.bodyToMono(Consumption.class);
-        return bill.flatMap(consumptionService::create)
-                .flatMap(consumption -> ServerResponse.created(URI.create("/consumption/".concat(consumption.getId())))
-                        .contentType(APPLICATION_JSON)
-                        .bodyValue(consumption));
+        Mono<Consumption> consumptionRequest = request.bodyToMono(Consumption.class);
+        Consumption consumptionDTO = new Consumption();
+        consumptionRequest.flatMap(consumption -> {
+           consumptionDTO.setDescription(consumption.getDescription());
+           consumptionDTO.setAmount(consumption.getAmount());
+           //if()
+            return null;
+        });
+        return null;
     }
 }
