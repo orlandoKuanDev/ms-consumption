@@ -14,6 +14,8 @@ import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
 
+import java.util.Objects;
+
 @Component
 @Slf4j(topic = "COMSUMPTION_HANDLER")
 public class ConsumptionHandler {
@@ -62,21 +64,27 @@ public class ConsumptionHandler {
         Mono<Consumption> consumptionRequest = request.bodyToMono(Consumption.class);
         Consumption consumptionDTO = new Consumption();
         return consumptionRequest
-                .flatMap(consumption -> acquisitionService.findByBillAccountNumber(consumption.getBill().getAccountNumber()))
+                .flatMap(consumption -> {
+                    consumptionDTO.setAmount(consumption.getAmount());
+                    return acquisitionService.findByBillAccountNumber(consumption.getBill().getAccountNumber());
+                })
                 .checkpoint("after consultation acquisition service web-client")
                 .flatMap(bill -> {
-            if (consumptionDTO.getAmount() < bill.getBill().getBalance()){
-                return Mono.error(new RuntimeException("The amount to consumption is higher than my bill balance"));
-                // pasar a evaluar la siguiente cuenta
-            }
-            bill.getBill().setBalance(bill.getBill().getBalance() - consumptionDTO.getAmount());
-            Transaction transaction = new Transaction();
-            transaction.setTransactionType("CONSUMPTION");
-            transaction.setTransactionAmount(consumptionDTO.getAmount());
-            transaction.setBill(bill.getBill());
-            transaction.setDescription(consumptionDTO.getDescription());
-            return transactionService.createTransaction(transaction);
-        })
+                    if (!Objects.equals(bill.getProduct().getProductName(), "TARJETA DE CREDITO")) {
+                        return Mono.error(new RuntimeException("You can only make consumptions to credit cards"));
+                    }
+                    if (consumptionDTO.getAmount() > bill.getBill().getBalance()){
+                        return Mono.error(new RuntimeException("The amount to consumption is higher than my credit line"));
+                        // pasar a evaluar la siguiente cuenta
+                    }
+                    bill.getBill().setBalance(bill.getBill().getBalance() - consumptionDTO.getAmount());
+                    Transaction transaction = new Transaction();
+                    transaction.setTransactionType("CONSUMPTION");
+                    transaction.setTransactionAmount(consumptionDTO.getAmount());
+                    transaction.setBill(bill.getBill());
+                    transaction.setDescription(consumptionDTO.getDescription());
+                    return transactionService.createTransaction(transaction);
+                })
                 .checkpoint("after transaction create")
                 .flatMap(transaction -> {
             consumptionDTO.setBill(transaction.getBill());
