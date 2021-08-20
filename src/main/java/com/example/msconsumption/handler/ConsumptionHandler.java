@@ -68,7 +68,7 @@ public class ConsumptionHandler {
                     consumptionDTO.setAmount(consumption.getAmount());
                     return acquisitionService.findByBillAccountNumber(consumption.getBill().getAccountNumber());
                 })
-                .checkpoint("after consultation acquisition service web-client")
+                .checkpoint("after consultation acquisition service web-client by account number")
                 .flatMap(bill -> {
                     if (!Objects.equals(bill.getProduct().getProductName(), "TARJETA DE CREDITO")) {
                         return Mono.error(new RuntimeException("You can only make consumptions to credit cards"));
