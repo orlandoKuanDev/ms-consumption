@@ -18,6 +18,7 @@ public class RouterConfig {
                 .andRoute(GET("/consumption/{id}"), handler::findById)
                 .andRoute(GET("/consumption/account/{accountNumber}"), handler::findByBillAccountNumber)
                 .andRoute(GET("/consumption/iban/{iban}"), handler::findByIban)
-                .andRoute(POST("/consumption"), handler::save);
+                .andRoute(POST("/consumption"), handler::save)
+                .andRoute(POST("/consumption/payment/update"), handler::save);
     }
 }
