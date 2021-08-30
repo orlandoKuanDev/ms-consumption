@@ -4,6 +4,7 @@ import com.example.msconsumption.models.Consumption;
 import com.example.msconsumption.models.Payment;
 import com.example.msconsumption.models.Transaction;
 import com.example.msconsumption.models.dto.ConsumptionCreateDTO;
+import com.example.msconsumption.models.dto.ConsumptionRequestDTO;
 import com.example.msconsumption.services.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.util.concurrent.AtomicDouble;
@@ -64,10 +65,80 @@ public class ConsumptionHandler {
                 .switchIfEmpty(ServerResponse.notFound().build());
     }
 
+    public Mono<ServerResponse> findCreditCard(ServerRequest request){
+        String creditCard = request.pathVariable("creditCard");
+        return paymentService.findByCreditCard(creditCard)
+                .flatMap(p -> ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(p))
+                .switchIfEmpty(ServerResponse.notFound().build());
+    }
+
     public Mono<ServerResponse> save(ServerRequest request) {
-        Mono<Consumption> consumptionRequest = request.bodyToMono(Consumption.class);
-        Consumption consumptionDTO = new Consumption();
-        return consumptionRequest
+        //Mono<Consumption> consumptionRequest = request.bodyToMono(Consumption.class);
+        Mono<ConsumptionRequestDTO> consumptionRequestDTOMono = request.bodyToMono(ConsumptionRequestDTO.class);
+        //Consumption consumptionDTO = new Consumption();
+        return consumptionRequestDTOMono
+                .zipWhen(requestConsumption -> paymentService.findByCreditCard(requestConsumption.getCreditCard()))
+                .zipWhen(payment -> {
+                    if (LocalDateTime.now().isAfter(payment.getT2().getExpirationDate())) {
+                        return Mono.error(new RuntimeException(String.format("You cannot make consumptions because you have to debt of -> %s soles", payment.getT2().getAmount())));
+                    }
+                    if (!Objects.equals(payment.getT2().getAcquisition().getProduct().getProductName(), "TARJETA DE CREDITO")) {
+                        return Mono.error(new RuntimeException("You can only make consumptions to credit cards"));
+                    }
+                    if (payment.getT1().getAmount() > payment.getT2().getAcquisition().getBill().getBalance()) {
+                        return Mono.error(new RuntimeException("The amount to consumption is higher than my credit line"));
+                        // pasar a evaluar la siguiente cuenta
+                    }
+                    payment.getT2().getAcquisition().getBill().setBalance(payment.getT2().getAcquisition().getBill().getBalance() - payment.getT1().getAmount());
+                    Transaction transaction = new Transaction();
+                    transaction.setTransactionType("CONSUMPTION");
+                    transaction.setTransactionAmount(payment.getT1().getAmount());
+                    transaction.setBill(payment.getT2().getAcquisition().getBill());
+                    transaction.setDescription(payment.getT1().getDescription());
+                    return transactionService.createTransaction(transaction);
+                })
+                .doOnError(error -> log.error("transaction create failed !!"))
+                .checkpoint("after transaction create", false)
+                .zipWhen(data -> {
+                    log.info("DEUDA -> {}", data.getT1().getT2().getCreditLine() - data.getT2().getBill().getBalance());
+                    return paymentService.updatePayment(Payment.builder()
+                            .acquisition(data.getT1().getT2().getAcquisition())
+                            .amount(data.getT1().getT2().getCreditLine() - data.getT2().getBill().getBalance())
+                            .build());
+                })
+                .doOnError(error -> log.error("payment create failed !!"))
+                .checkpoint("after payment update", false)
+                .flatMap(result -> {
+                    Consumption consumption = new Consumption();
+                    consumption.setAcquisition(result.getT2().getAcquisition());
+                    consumption.setAmount(result.getT1().getT1().getT1().getAmount());
+                    consumption.setDescription(result.getT1().getT1().getT1().getDescription());
+                    return consumptionService.create(consumption);
+                })
+                .map(consumption ->  {
+                    return ConsumptionCreateDTO.builder()
+                            .amount(consumption.getAmount())
+                            .description(consumption.getDescription())
+                            .accountNumber(consumption.getAcquisition().getBill().getAccountNumber())
+                            .creditCard(consumption.getAcquisition().getCardNumber())
+
+                            .productName(consumption.getAcquisition().getProduct().getProductName())
+                            .totalDebt(consumption.getAcquisition().getInitial() - consumption.getAcquisition().getBill().getBalance())
+
+                            .build();
+                })
+                .doOnError(error -> log.error("consumption create failed !!"))
+                .checkpoint("after consumption create", false)
+                .flatMap(p -> ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(p))
+                .switchIfEmpty(ServerResponse.notFound().build())
+                .log()
+                .onErrorResume(e -> Mono.error(new RuntimeException(e.getMessage())));
+
+        /*return consumptionRequest
                 .flatMap(consumption -> {
                     consumptionDTO.setAmount(consumption.getAmount());
                     consumptionDTO.setDescription(consumption.getDescription());
@@ -98,16 +169,16 @@ public class ConsumptionHandler {
                 .doOnError(error -> log.error("transaction create failed !!"))
                 .checkpoint("after transaction create", false)
                 .zipWhen(transaction -> {
-                    log.info("DEUDA -> {}", transaction.getT1().getT1().getInitial() - transaction.getT2().getBill().getBalance());
+                    log.info("DEUDA -> {}", transaction.getT1().getT2().getCreditLine() - transaction.getT2().getBill().getBalance());
                     return paymentService.updatePayment(Payment.builder()
-                            .acquisition(transaction.getT1().getT1())
+                            .acquisition(transaction.getT1().getT2().getAcquisition())
                             .amount(transaction.getT1().getT1().getInitial() - transaction.getT2().getBill().getBalance())
                             .build());
                 })
                 .doOnError(error -> log.error("payment create failed !!"))
                 .checkpoint("after payment update", false)
                 .flatMap(transaction -> {
-                    consumptionDTO.setAcquisition(transaction.getT1().getT1().getT1());
+                    consumptionDTO.setAcquisition(transaction.getT2().getAcquisition());
                     return consumptionService.create(consumptionDTO);
                 })
                 .map(consumption ->  {
@@ -128,6 +199,6 @@ public class ConsumptionHandler {
                         .bodyValue(p))
                 .switchIfEmpty(ServerResponse.notFound().build())
                 .log()
-                .onErrorResume(e -> Mono.error(new RuntimeException(e.getMessage())));
+                .onErrorResume(e -> Mono.error(new RuntimeException(e.getMessage())));*/
     }
 }

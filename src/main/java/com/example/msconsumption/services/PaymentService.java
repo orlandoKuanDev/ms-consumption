@@ -46,6 +46,23 @@ public class PaymentService {
                 .bodyToMono(Payment.class);
     }
 
+    public Mono<Payment> findByCreditCard(String creditCard) {
+        return webClientBuilder
+                .baseUrl("http://SERVICE-PAYMENT/payment")
+                .build()
+                .get()
+                .uri("/card/{creditCard}", Collections.singletonMap("creditCard", creditCard))
+                .accept(APPLICATION_JSON)
+                .retrieve()
+                .onStatus(HttpStatus::isError, response -> {
+                    logTraceResponse(logger, response);
+                    return Mono.error(new RuntimeException(
+                            String.format("THE IBAN DONT EXIST IN MICRO SERVICE CONSUMPTION-> %s", creditCard)
+                    ));
+                })
+                .bodyToMono(Payment.class);
+    }
+
     public Mono<Payment> updatePayment(Payment payment){
         return webClientBuilder
                 .baseUrl("http://SERVICE-PAYMENT/payment")

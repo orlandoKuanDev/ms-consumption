@@ -16,4 +16,6 @@ public class Bill {
     private String accountNumber;
     @Field(name = "balance")
     private Double balance;
+    @Field(name = "acquisition")
+    private Acquisition acquisition;
 }
